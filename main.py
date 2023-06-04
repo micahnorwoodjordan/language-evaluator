@@ -1,6 +1,6 @@
-from UserInteraction.utilities import get_language, get_series, display_results
+from UserInteraction.user_interaction_utilities import get_language, get_series, display_results
 from LanguageEvaluation.language_evaluator import LanguageEvaluator
-
+from TokenStorage.token_storage_utilities import TOKEN_STORAGE_FILE, save_tokens
 
 if __name__ == '__main__':
     """
@@ -14,9 +14,11 @@ if __name__ == '__main__':
             print(e)
             return
 
+        token_storage_filepath = TOKEN_STORAGE_FILE.format(language=language.name)
         series = get_series()
         evaluator = LanguageEvaluator(language)
         tokens = evaluator.get_distinct_tokens(series)
+        save_tokens(token_storage_filepath, tokens)
         display_results(tokens)
 
-do()
+    do()

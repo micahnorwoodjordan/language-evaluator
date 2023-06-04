@@ -1,4 +1,4 @@
-from LanguageEvaluation.utilities import SupportedLanguages
+from LanguageEvaluation.language_utilities import SupportedLanguages
 
 
 class LanguageEvaluator:
@@ -24,7 +24,7 @@ class LanguageEvaluator:
 
     @staticmethod
     def sanitize_spanish_string(string):
-        pass  # coming soon
+        pass  # TODO
 
     def get_distinct_tokens(self, series):
         """
