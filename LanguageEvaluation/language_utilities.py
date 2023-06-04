@@ -14,4 +14,3 @@ class LanguageDetector:
     def detect_language(self):
         for token in self.language_tokens:
             pass
-            return self.language

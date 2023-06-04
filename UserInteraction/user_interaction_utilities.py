@@ -1,4 +1,4 @@
-from LanguageEvaluation.utilities import SupportedLanguages
+from LanguageEvaluation.language_utilities import SupportedLanguages
 from exceptions import InputRecursionException
 
 
