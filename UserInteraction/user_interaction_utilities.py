@@ -50,8 +50,8 @@ def get_language(recurses=None, msg=None):
 def display_results(tokens, minimal=True):
     msg = 'Here are your results: \n'
     if minimal:
-        results = f'{len(tokens)} distinct words'
-    else:
+        results = f'The index has been updated with {len(tokens)} distinct word(s).'
+    else:  # TODO: define a more detailed presentation scheme
         results = ''
         for token in tokens:
             results += f'{token}\n'
