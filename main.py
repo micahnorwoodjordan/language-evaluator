@@ -2,7 +2,7 @@ import argparse
 
 from UserInteraction.user_interaction_utilities import get_language, get_entry, display_results
 from LanguageEvaluation.language_evaluator import LanguageEvaluator
-from TokenIndexing.token_indexing_utilities import save_tokens_for_language
+from TokenIndexing.token_indexing_utilities import index_tokens
 
 if __name__ == '__main__':
     """
@@ -19,7 +19,7 @@ if __name__ == '__main__':
         entry = get_entry()
         evaluator = LanguageEvaluator(language)
         tokens = evaluator.tokenize_entry(entry)
-        save_tokens_for_language(tokens, language.name)
+        index_tokens(tokens, language.name)
         display_results(tokens)
 
     def run_app():
