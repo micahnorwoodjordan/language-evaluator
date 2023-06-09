@@ -1,6 +1,6 @@
 import argparse
 
-from UserInteraction.user_interaction_utilities import get_language, get_series, display_results
+from UserInteraction.user_interaction_utilities import get_language, get_entry, display_results
 from LanguageEvaluation.language_evaluator import LanguageEvaluator
 from TokenStorage.token_storage_utilities import save_tokens_for_language
 
@@ -16,9 +16,9 @@ if __name__ == '__main__':
             print(e)
             return
 
-        series = get_series()
+        entry = get_entry()
         evaluator = LanguageEvaluator(language)
-        tokens = evaluator.get_distinct_tokens(series)
+        tokens = evaluator.tokenize_entry(entry)
         save_tokens_for_language(tokens, language.name)
         display_results(tokens)
 

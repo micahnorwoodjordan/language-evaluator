@@ -1,41 +1,29 @@
-from LanguageEvaluation.language_utilities import SupportedLanguages
+import spacy
+from enum import Enum
+
+
+class SupportedLanguages(Enum):
+    english = 1
+    spanish = 2
+
+
+# should language model signatures be masked?
+SPACY_LANGUAGE_MODEL_MAP = {
+    SupportedLanguages.english: 'en_core_web_md',
+    SupportedLanguages.spanish: 'es_core_web_md',
+}
 
 
 class LanguageEvaluator:
     """
     evaluate the complexity of a series of strings entered by a user
+    TODO: handle mispelled words
+    TODO: handle hyphenated words
     """
     def __init__(self, language):
-        self.language = language
+        self.NLP = spacy.load(SPACY_LANGUAGE_MODEL_MAP[language])  # natural language processor
+        self.tokens = []
 
-    @staticmethod
-    def sanitize_english_string(string):
-        """
-        trim non-alpha characters from string
-        """
-        ascii_A = 65
-        ascii_z = 122
-        sanitized = ''
-
-        for c in string:
-            if ascii_A <= ord(c) <= ascii_z or c == ' ':
-                sanitized += c
-        return sanitized.strip()
-
-    @staticmethod
-    def sanitize_spanish_string(string):
-        pass  # TODO
-
-    def get_distinct_tokens(self, series):
-        """
-        parse a series of strings to extract the individual tokens
-        """
-        distinct_tokens = set()
-
-        for sentence in series:
-            if self.language == SupportedLanguages.english:
-                sentence = LanguageEvaluator.sanitize_english_string(sentence)
-            for token in sentence.split(' '):  # tokenize by whitespace
-                distinct_tokens.add(token)
-
-        return distinct_tokens
+    def tokenize_entry(self, entry):
+        tokens = [str(token).strip() for token in self.NLP(entry) if not token.is_punct and token.is_alpha]
+        return tokens
