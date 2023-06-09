@@ -89,7 +89,7 @@ class LanguageEvaluator:
         any matches on the regular expressions and rules configured in the REJECTION_PATTERN_CONFIGURATION will
         also be parsed out.
         """
-        def parse_matches(matches):
+        def parse_regex_matches(matches):
             for _, start, end in matches:
                 span = doc[start:end]
                 yield span.text
@@ -97,7 +97,7 @@ class LanguageEvaluator:
         tokens = set()
         doc = self.NLP(entry)  # non-intuitive spaCy term
         rejection_regex_matches = [
-            token for match in parse_matches(self.matcher(doc)) for token in match.split(' ')
+            token for match in parse_regex_matches(self.matcher(doc)) for token in match.split(' ')
         ]  # TODO: not safe to assume that ALL matches will be delimited by a space character
 
         for token in doc:
