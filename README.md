@@ -4,7 +4,6 @@ i want to get a feel for how many words i know in any given language...should he
 this would make the most sense by creating a journaling utility that indexes individual language tokens to slowly track progress
 
 *TODOS*:
-
 index import:
 
 - use case:
