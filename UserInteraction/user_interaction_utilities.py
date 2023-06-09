@@ -42,7 +42,7 @@ def get_language(recurses=None, msg=None):
     try:
         language = input(msg)
         return SupportedLanguages(int(language))
-    except ValueError as e:
+    except ValueError:
         recurses += 1
         get_language(recurses, msg)  # probably a better solution than recursing
 
