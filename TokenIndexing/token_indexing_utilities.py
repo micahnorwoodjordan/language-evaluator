@@ -1,6 +1,6 @@
 from pathlib import Path
 
-TOKEN_STORAGE_FILE = '{language}-tokens.txt'
+TOKEN_STORAGE_FILE = 'artifacts/token-indexing/{language}-tokens.txt'
 
 
 def get_saved_tokens_for_language(language):

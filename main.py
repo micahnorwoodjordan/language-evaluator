@@ -2,7 +2,7 @@ import argparse
 
 from UserInteraction.user_interaction_utilities import get_language, get_entry, display_results
 from LanguageEvaluation.language_evaluator import LanguageEvaluator
-from TokenStorage.token_storage_utilities import save_tokens_for_language
+from TokenIndexing.token_indexing_utilities import save_tokens_for_language
 
 if __name__ == '__main__':
     """
