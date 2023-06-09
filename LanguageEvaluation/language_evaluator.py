@@ -1,6 +1,9 @@
 import enum
 
-from spacy import load, util, tokenizer, matcher
+from spacy import (
+    load,  # methods
+    util, tokenizer, matcher, lang  # modules/classes
+)
 
 
 class UnsupportedLanguageException(Exception):
@@ -41,9 +44,9 @@ class LanguageEvaluator:
     will not be considered "words", and will be parsed out of the token indexing process:
         * proper nouns
         * non-lemma forms
+        * contractions (will be expanded into their individial components)
 
     TODO: handle mispelled words
-    TODO: handle conjunctions
     TODO: consider analyzing token frequency within a user's Journal
     TODO: consider part of speech (POS) tagging
 
@@ -60,6 +63,7 @@ class LanguageEvaluator:
         infix_re = util.compile_infix_regex(list(_processor.Defaults.infixes) + EXTRA_INFIXES['default'])
         _processor.tokenizer = tokenizer.Tokenizer(
             _processor.vocab,
+            rules=lang.en.tokenizer_exceptions._exc,  # must supply the tokenizer with exceptions and special cases
             prefix_search=prefix_re.search,
             suffix_search=suffix_re.search,
             infix_finditer=infix_re.finditer,
@@ -97,8 +101,10 @@ class LanguageEvaluator:
         ]  # TODO: not safe to assume that ALL matches will be delimited by a space character
 
         for token in doc:
-            if not token.is_punct and token.is_alpha:
-                token = token.lemma_
-                if token not in tokens and token not in rejection_regex_matches:
-                    tokens.add(token)
+            if token.is_punct:
+                continue
+            token = token.lemma_
+            if token in tokens or token in rejection_regex_matches:
+                continue
+            tokens.add(token)
         return tokens
