@@ -1,18 +1,18 @@
-from LanguageEvaluation.language_utilities import SupportedLanguages
+from LanguageEvaluation.language_evaluator import SupportedLanguages
 from exceptions import InputRecursionException
 
 
 REMINDER_PROMPT_THRESHOLD = 10
 
 
-def get_series():
+def get_entry():
     """
     handle user input
     """
     inp = None
     user_checkin_msg = 'enter "done" whenever you\'re done.\n'  # TODO: randomize messages for UX
     intro_prompt = 'tell an interesting story. ' + user_checkin_msg
-    series = set()
+    entry = ''
     iterations = 0
 
     print(intro_prompt)
@@ -20,14 +20,14 @@ def get_series():
     while inp != 'done':
         inp = input('>>> ')
         if inp != 'done':
-            series.add(inp)
+            entry += inp
 
         if iterations > 0:
             if iterations % REMINDER_PROMPT_THRESHOLD == 0:
                 print('remember, ' + user_checkin_msg)  # maybe user forgot how to exit
         iterations += 1
 
-    return series
+    return entry
 
 
 def get_language(recurses=None, msg=None):
@@ -42,7 +42,7 @@ def get_language(recurses=None, msg=None):
     try:
         language = input(msg)
         return SupportedLanguages(int(language))
-    except ValueError as e:
+    except ValueError:
         recurses += 1
         get_language(recurses, msg)  # probably a better solution than recursing
 
