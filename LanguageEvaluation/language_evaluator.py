@@ -37,6 +37,12 @@ REJECTION_PATTERN_CONFIGURATION = {
     },
 }
 
+PRONOUN_LEMMA_OVERRIDE_CONFIGURATION = {  # peculiarly, spaCy doesn't know what to do with some pronouns. this'll be fun
+    'us': 'we',
+}
+for k, v in zip(list(PRONOUN_LEMMA_OVERRIDE_CONFIGURATION.keys()), list(PRONOUN_LEMMA_OVERRIDE_CONFIGURATION.values())):
+    PRONOUN_LEMMA_OVERRIDE_CONFIGURATION[k.title()] = v.title()
+
 
 class LanguageEvaluator:
     """
@@ -94,17 +100,24 @@ class LanguageEvaluator:
                 span = doc[start:end]
                 yield span.text
 
-        tokens = set()
+        tokens = []  # ensure deterministic results for testing
         doc = self.NLP(entry)  # non-intuitive spaCy term
         rejection_regex_matches = [
             token for match in parse_regex_matches(self.matcher(doc)) for token in match.split(' ')
         ]  # TODO: not safe to assume that ALL matches will be delimited by a space character
 
         for token in doc:
-            if token.is_punct:
+            should_reject = token.is_punct or \
+                token.lemma_ in tokens or token.text in tokens or \
+                token.lemma_ in rejection_regex_matches or token.text in rejection_regex_matches
+            if should_reject:
                 continue
-            token = token.lemma_
-            if token in tokens or token in rejection_regex_matches:
-                continue
-            tokens.add(token)
+
+            # this is very clunky but it handles awkward cases where example: token.text = "us" && token.lemma_ = "u"
+            if token.text in PRONOUN_LEMMA_OVERRIDE_CONFIGURATION:
+                override = PRONOUN_LEMMA_OVERRIDE_CONFIGURATION[token.text]
+                if override not in tokens:
+                    tokens.append(override)
+            else:
+                tokens.append(token.lemma_)
         return tokens
