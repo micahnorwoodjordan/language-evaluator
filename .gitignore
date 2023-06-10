@@ -3,3 +3,4 @@ artifacts/token-indexing/
 venv/
 .pytest_cache/
 .coverage
+notes.md
