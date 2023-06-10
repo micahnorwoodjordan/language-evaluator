@@ -1,4 +1,5 @@
 import enum
+import copy
 
 from spacy import (
     load,  # methods
@@ -19,8 +20,25 @@ class SupportedLanguages(enum.Enum):
     spanish = 2
 
 
+def titlize_map_entries(m, *args):
+    """
+    titleize only certain part-of-speech configurations within the master LEMMA_OVERRIDE_CONFIGURATION
+    :param m: dict
+    :param args: list
+    :return m: dict
+    """
+    m = copy.deepcopy(m)
+    root_keys = list(m.keys())
+    for root_key in root_keys:
+        if root_key not in args:
+            continue
+        for child_key, child_value in zip(list(m[root_key].keys()), list(m[root_key].values())):
+            m[root_key][child_key.title()] = child_value
+    return m
+
+
 # should language model signatures be masked?
-SPACY_LANGUAGE_MODEL_MAP = {
+LANGUAGE_MODEL_MAP = {
     SupportedLanguages.english: 'en_core_web_md',
     SupportedLanguages.spanish: 'es_core_web_md',
 }
@@ -36,6 +54,19 @@ REJECTION_PATTERN_CONFIGURATION = {
         ],
     },
 }
+
+# peculiarly, spaCy doesn't know what to do with some pronouns. if other parts of speech have these awkward cases, they
+# can be easily hooked into these override configuration settings
+LEMMA_OVERRIDE_PARTS_OF_SPEECH = ('PRONOUNS', )
+LEMMA_OVERRIDE_CONFIGURATION = titlize_map_entries(
+    {
+        'PRONOUNS': {
+            'us': 'we',
+            'him': 'he',
+        },
+    },
+    *LEMMA_OVERRIDE_PARTS_OF_SPEECH
+)
 
 
 class LanguageEvaluator:
@@ -57,7 +88,7 @@ class LanguageEvaluator:
         configure the class instance's Natural Language Processor (NLP) by specifying a language. without any extra
         kwargs, the NLP will pull from the default tokenization and pattern matching configurations.
         """
-        _processor = load(SPACY_LANGUAGE_MODEL_MAP[language])
+        _processor = load(LANGUAGE_MODEL_MAP[language])
         prefix_re = util.compile_prefix_regex(_processor.Defaults.prefixes)
         suffix_re = util.compile_suffix_regex(_processor.Defaults.suffixes)
         infix_re = util.compile_infix_regex(list(_processor.Defaults.infixes) + EXTRA_INFIXES['default'])
@@ -94,17 +125,33 @@ class LanguageEvaluator:
                 span = doc[start:end]
                 yield span.text
 
-        tokens = set()
+        def handle_lemma_override(token, pos):
+            if token.text in LEMMA_OVERRIDE_CONFIGURATION[pos]:
+                override = LEMMA_OVERRIDE_CONFIGURATION[pos][token.text]
+                return override
+
+        tokens = []  # ensure deterministic results for testing
         doc = self.NLP(entry)  # non-intuitive spaCy term
         rejection_regex_matches = [
             token for match in parse_regex_matches(self.matcher(doc)) for token in match.split(' ')
         ]  # TODO: not safe to assume that ALL matches will be delimited by a space character
 
         for token in doc:
-            if token.is_punct:
+            should_reject = token.is_punct or \
+                token.lemma_ in tokens or token.text in tokens or \
+                token.lemma_ in rejection_regex_matches or token.text in rejection_regex_matches
+            if should_reject:
                 continue
-            token = token.lemma_
-            if token in tokens or token in rejection_regex_matches:
-                continue
-            tokens.add(token)
+
+            # this is very clunky but it handles incorrect spaCy token lemmas. this is only relevant to
+            # pronouns so far, but let's wire this up for any future lemma overrides
+            # TODO: explore potential override clashes between different POS's
+            for pos in LEMMA_OVERRIDE_CONFIGURATION.keys():
+                override_or_none = handle_lemma_override(token, pos)
+                if override_or_none is None:
+                    token = token.lemma_
+                else:
+                    token = override_or_none
+                if token not in tokens:
+                    tokens.append(token)
         return tokens

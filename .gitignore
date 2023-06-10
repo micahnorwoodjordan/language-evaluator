@@ -1,3 +1,5 @@
 __pycache__/
 artifacts/token-indexing/
 venv/
+.pytest_cache/
+.coverage
