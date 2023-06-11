@@ -2,7 +2,6 @@ from LanguageEvaluation.language_evaluator import LanguageEvaluator, SupportedLa
 
 
 class TestEnglishEvaluation:
-    # TODO: test lemma overrides
     def test_general_evaluation(self):
         evaluator = LanguageEvaluator(SupportedLanguages.english)
         entry = "...And I told him: 'Don't mess with me. I'll kick your butt!'"
@@ -37,8 +36,6 @@ class TestEnglishEvaluation:
         assert tokens == ['he', 'I', 'we', 'she', 'they']
 
     def test_phone_number_evaluation(self):
-        # TODO: phone numbers with this pattern won't be correctly parsed out: "(ddd)-".  maybe tokenizer-matcher clash
-        # figure out a workaround.
         evaluator = LanguageEvaluator(SupportedLanguages.english)
         entry = 'call me at number 123-456-7890'  # US_CONVENTIONAL
         tokens = evaluator.tokenize_entry(entry)
@@ -48,6 +45,7 @@ class TestEnglishEvaluation:
         tokens = evaluator.tokenize_entry(entry)
         assert tokens == ['call', 'I', 'at', 'number']
 
+        # BUG: MATCHER: PHONE_NUMBER
         # entry = 'call me at number (123)-456-7890'  # US_PUNCTUATED
         # tokens = evaluator.tokenize_entry(entry)
         # assert tokens == ['call', 'I', 'at', 'number']
@@ -68,12 +66,40 @@ class TestEnglishEvaluation:
         tokens = evaluator.tokenize_entry(entry)
         assert tokens == ['call', 'I', 'at', 'number']
 
+        # BUG: MATCHER: PHONE_NUMBER
         # entry = 'call me at number +1 (123)-456-7890'  # INTL_PUNCTUATED
         # tokens = evaluator.tokenize_entry(entry)
         # assert tokens == ['call', 'I', 'at', 'number']
 
-    def test_regex_pattern_matching(self):
+    def test_nlp_matcher_rejection(self):
+        # BUG: TOKENIZER: STOP_WORD
+        # entry = 'this is a proper noun: Sir Charles Noun. this is a phone number: +1 (123) 456-7890'
+        # tokens = evaluator.tokenize_entry(entry)
+        # assert tokens == ['this', 'be', 'proper', 'noun', 'phone', 'number']
+
         evaluator = LanguageEvaluator(SupportedLanguages.english)
-        entry = 'this is a proper noun: Sir Charles Noun. this is a phone number: +1 (123) 456-7890'
+        entry = 'here\'s a proper noun: Sir Charles Noun. this is a phone number: +1 (123) 456-7890'
         tokens = evaluator.tokenize_entry(entry)
-        assert tokens == ['this', 'be', 'proper', 'noun', 'phone', 'number']
+        assert tokens == ['here', 'be', 'proper', 'noun', 'this', 'phone', 'number']
+
+    def test_nlp_matcher_rejection_exceptions(self):
+        evaluator = LanguageEvaluator(SupportedLanguages.english)
+        entry = 'this is a proper noun: Micah Norwood'
+        matcher_exceptions = ['Micah', 'Norwood']
+        tokens = evaluator.tokenize_entry(entry, matcher_exceptions=matcher_exceptions)
+        assert tokens == ['this', 'be', 'proper', 'noun', 'Micah', 'Norwood']
+
+        matcher_exceptions = []
+        tokens = evaluator.tokenize_entry(entry, matcher_exceptions=matcher_exceptions)
+        assert tokens == ['this', 'be', 'proper', 'noun']
+
+        # awkward, and probably won't ever happen, but it demonstrates that tokenizer and matcher are playing nice
+        entry = 'this is a phone number: +1 (123) 456-7890'
+        matcher_exceptions = ['+1', '123', '456', '7890']
+        tokens = evaluator.tokenize_entry(entry, matcher_exceptions=matcher_exceptions)
+        assert tokens == ['this', 'be', 'a', 'phone', 'number', '+1', '123', '456', '7890']
+
+        entry = 'this is a phone number: +1 123-456-7890'
+        matcher_exceptions = ['+1', '123', '456', '7890']
+        tokens = evaluator.tokenize_entry(entry, matcher_exceptions=matcher_exceptions)
+        assert tokens == ['this', 'be', 'a', 'phone', 'number', '+1', '123', '456', '7890']

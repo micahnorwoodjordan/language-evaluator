@@ -60,6 +60,7 @@ REJECTION_PATTERN_CONFIGURATION = {
             {'POS': 'PROPN'}, {'POS': 'PROPN'}  # pattern translation ---> part of speech: proper noun
         ],
     },
+    # NOTE: remove parenthesis when providing phone numbers as matcher exceptions or the tokenizer will ruin evaluation
     'PHONE_NUMBERS': {
         'INTL_CONVENTIONAL': [
             {'ORTH': '+1'}, {'SHAPE': 'ddd'}, {'ORTH': '-', 'OP': '?'},
@@ -101,13 +102,15 @@ class LanguageEvaluator:
     will not be considered "words", and will be parsed out of the token indexing process:
         * proper nouns
         * non-lemma forms
-        * contractions (will be expanded into their individial components)
+        * contractions (will be expanded out to their individial components)
 
     TODO: handle mispelled words
-    TODO: ensure English stop words (such as "a") are parsed correctly
+    TODO: handle numbers/integers
     TODO: consider analyzing token frequency within a user's Journal
     TODO: consider part of speech (POS) tagging
-    TODO: handle numbers/integers
+    TODO: test lemma overrides
+    TODO: parse English stop words (such as "a") correctly
+    TODO: phone numbers with this pattern won't be correctly parsed out: "(ddd)-".  maybe tokenizer-matcher clash
 
     reference: https://realpython.com/natural-language-processing-spacy-python
     """
@@ -141,7 +144,7 @@ class LanguageEvaluator:
     def __init__(self, language):
         self._configure_processor(language)
 
-    def tokenize_entry(self, entry, regex_exceptions=None):
+    def tokenize_entry(self, entry, matcher_exceptions=None):
         """
         when entries get tokenized, only each token's base form will be considered.
         for example, the tokenizer will parse out the tokens "do", "doing", "did", and "does" from an expression
@@ -150,19 +153,20 @@ class LanguageEvaluator:
         any matches on the regular expressions and rules configured in the REJECTION_PATTERN_CONFIGURATION will
         also be parsed out.
         """
-        tokens = []  # ensure deterministic results for testing
+        tokens = []  # ensures deterministic results for testing
         doc = self.NLP(entry)  # non-intuitive spaCy term
         rejection_regex_matches = [
             token for match in get_regex_matches(self.matcher(doc), doc) for token in match.split(' ')
         ]  # TODO: not safe to assume that ALL matches will be delimited by a space character
-        regex_exceptions = regex_exceptions or []
+        matcher_exceptions = matcher_exceptions or []
 
-        for token in doc:
-            should_reject = token.is_punct or token.lemma_ in tokens or token.text in tokens or \
-                any([token.lemma_ in m or token.text in m for m in rejection_regex_matches]) and \
-                token.text not in regex_exceptions
-            if should_reject:
-                continue
+        for token in doc:  # run tokens through the matcher before anything else
+            if token.text not in matcher_exceptions and token.lemma_ not in matcher_exceptions:
+                should_reject = token.is_punct or \
+                    token.lemma_ in tokens or token.text in tokens or \
+                    any([token.lemma_ in m or token.text in m for m in rejection_regex_matches])
+                if should_reject:
+                    continue
 
             # this is very clunky but it handles incorrect spaCy token lemmas. this is only relevant to
             # pronouns so far, but let's wire this up for any future lemma overrides
