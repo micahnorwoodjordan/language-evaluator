@@ -8,7 +8,7 @@ from spacy import (
 from .language_utilities import titlize_map_entries
 
 
-def get_regex_matches(matches, doc):
+def get_matcher_matches(matches, doc):
     """
     :param matches: spacy.matcher.Matcher
     :param doc: spacy.tokens.Doc
@@ -156,7 +156,7 @@ class LanguageEvaluator:
         tokens = []  # ensures deterministic results for testing
         doc = self.NLP(entry)  # non-intuitive spaCy term
         rejection_regex_matches = [
-            token for match in get_regex_matches(self.matcher(doc), doc) for token in match.split(' ')
+            token for match in get_matcher_matches(self.matcher(doc), doc) for token in match.split(' ')
         ]  # TODO: not safe to assume that ALL matches will be delimited by a space character
         matcher_exceptions = matcher_exceptions or []
 
