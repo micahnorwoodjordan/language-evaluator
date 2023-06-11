@@ -60,6 +60,25 @@ REJECTION_PATTERN_CONFIGURATION = {
             {'POS': 'PROPN'}, {'POS': 'PROPN'}  # pattern translation ---> part of speech: proper noun
         ],
     },
+    'PHONE_NUMBERS': {
+        'INTL_CONVENTIONAL': [
+            {'ORTH': '+1'}, {'SHAPE': 'ddd'}, {'ORTH': '-', 'OP': '?'},
+            {'SHAPE': 'ddd'}, {'ORTH': '-'}, {'SHAPE': 'dddd'}
+        ],
+        'INTL_PUNCTUATED': [
+            {'ORTH': '+1'}, {'ORTH': '('}, {'SHAPE': 'ddd'},
+            {'ORTH': ')'}, {'ORTH': '-', 'OP': '?'},
+            {'SHAPE': 'ddd'}, {'ORTH': '-'}, {'SHAPE': 'dddd'}
+        ],
+        'US_CONVENTIONAL': [
+            {'SHAPE': 'ddd'}, {'ORTH': '-', 'OP': '?'},
+            {'SHAPE': 'ddd'}, {'ORTH': '-'}, {'SHAPE': 'dddd'}
+        ],
+        'US_PUNCTUATED': [
+            {'ORTH': '('}, {'SHAPE': 'ddd'}, {'ORTH': ')'}, {'ORTH': '-', 'OP': '?'},
+            {'SHAPE': 'ddd'}, {'ORTH': '-'}, {'SHAPE': 'dddd'}
+        ],
+    }
 }
 
 # peculiarly, spaCy doesn't know what to do with some pronouns. if other parts of speech have these awkward cases, they
@@ -85,8 +104,10 @@ class LanguageEvaluator:
         * contractions (will be expanded into their individial components)
 
     TODO: handle mispelled words
+    TODO: ensure English stop words (such as "a") are parsed correctly
     TODO: consider analyzing token frequency within a user's Journal
     TODO: consider part of speech (POS) tagging
+    TODO: handle numbers/integers
 
     reference: https://realpython.com/natural-language-processing-spacy-python
     """
@@ -106,11 +127,13 @@ class LanguageEvaluator:
             suffix_search=suffix_re.search,
             infix_finditer=infix_re.finditer,
         )
+        patterns = []
         _matcher = matcher.Matcher(_processor.vocab)
         rejection_configs = [config for config in REJECTION_PATTERN_CONFIGURATION.values()]
         for config in rejection_configs:
             for rejection_key, pattern in config.items():  # NOTE: iteration is funny, since each dict is only length 1
-                _matcher.add(rejection_key, [pattern])
+                patterns.append(pattern)
+        _matcher.add(rejection_key, patterns)
 
         self.matcher = _matcher
         self.NLP = _processor
@@ -118,7 +141,7 @@ class LanguageEvaluator:
     def __init__(self, language):
         self._configure_processor(language)
 
-    def tokenize_entry(self, entry):
+    def tokenize_entry(self, entry, regex_exceptions=None):
         """
         when entries get tokenized, only each token's base form will be considered.
         for example, the tokenizer will parse out the tokens "do", "doing", "did", and "does" from an expression
@@ -132,11 +155,12 @@ class LanguageEvaluator:
         rejection_regex_matches = [
             token for match in get_regex_matches(self.matcher(doc), doc) for token in match.split(' ')
         ]  # TODO: not safe to assume that ALL matches will be delimited by a space character
+        regex_exceptions = regex_exceptions or []
 
         for token in doc:
-            should_reject = token.is_punct or \
-                token.lemma_ in tokens or token.text in tokens or \
-                token.lemma_ in rejection_regex_matches or token.text in rejection_regex_matches
+            should_reject = token.is_punct or token.lemma_ in tokens or token.text in tokens or \
+                any([token.lemma_ in m or token.text in m for m in rejection_regex_matches]) and \
+                token.text not in regex_exceptions
             if should_reject:
                 continue
 
