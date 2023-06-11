@@ -104,6 +104,7 @@ class LanguageEvaluator:
         * non-lemma forms
         * contractions (will be expanded out to their individial components)
 
+    TODO: consider tree and subtree navigation for more language analystics
     TODO: handle mispelled words
     TODO: handle numbers/integers
     TODO: consider analyzing token frequency within a user's Journal
