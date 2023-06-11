@@ -1,10 +1,34 @@
 import enum
-import copy
 
 from spacy import (
     load,  # methods
     util, tokenizer, matcher, lang  # modules/classes
 )
+
+from .language_utilities import titlize_map_entries
+
+
+def get_matcher_matches(matches, doc):
+    """
+    :param matches: spacy.matcher.Matcher
+    :param doc: spacy.tokens.Doc
+    obtain all regex matches from a Doc object. as a note, the underlying regex has been baked into the Matcher
+    attached to the NLP instance and can't be altered at this point
+    """
+    for _, start, end in matches:
+        span = doc[start:end]
+        yield span.text
+
+
+def get_lemma_override(token, pos):
+    """
+    access the lemma override in the master LEMMA_OVERRIDE_CONFIGURATION in cases where spaCy yields incorrect lemmas
+    :param token: spacy.tokens.token.Token
+    :param pos: str
+    """
+    if token.text in LEMMA_OVERRIDE_CONFIGURATION[pos]:
+        override = LEMMA_OVERRIDE_CONFIGURATION[pos][token.text]
+        return override
 
 
 class UnsupportedLanguageException(Exception):
@@ -18,23 +42,6 @@ class LanguageEvaluationException(Exception):
 class SupportedLanguages(enum.Enum):
     english = 1
     spanish = 2
-
-
-def titlize_map_entries(m, *args):
-    """
-    titleize only certain part-of-speech configurations within the master LEMMA_OVERRIDE_CONFIGURATION
-    :param m: dict
-    :param args: list
-    :return m: dict
-    """
-    m = copy.deepcopy(m)
-    root_keys = list(m.keys())
-    for root_key in root_keys:
-        if root_key not in args:
-            continue
-        for child_key, child_value in zip(list(m[root_key].keys()), list(m[root_key].values())):
-            m[root_key][child_key.title()] = child_value
-    return m
 
 
 # should language model signatures be masked?
@@ -53,6 +60,26 @@ REJECTION_PATTERN_CONFIGURATION = {
             {'POS': 'PROPN'}, {'POS': 'PROPN'}  # pattern translation ---> part of speech: proper noun
         ],
     },
+    # NOTE: remove parenthesis when providing phone numbers as matcher exceptions or the tokenizer will ruin evaluation
+    'PHONE_NUMBERS': {
+        'INTL_CONVENTIONAL': [
+            {'ORTH': '+1'}, {'SHAPE': 'ddd'}, {'ORTH': '-', 'OP': '?'},
+            {'SHAPE': 'ddd'}, {'ORTH': '-'}, {'SHAPE': 'dddd'}
+        ],
+        'INTL_PUNCTUATED': [
+            {'ORTH': '+1'}, {'ORTH': '('}, {'SHAPE': 'ddd'},
+            {'ORTH': ')'}, {'ORTH': '-', 'OP': '?'},
+            {'SHAPE': 'ddd'}, {'ORTH': '-'}, {'SHAPE': 'dddd'}
+        ],
+        'US_CONVENTIONAL': [
+            {'SHAPE': 'ddd'}, {'ORTH': '-', 'OP': '?'},
+            {'SHAPE': 'ddd'}, {'ORTH': '-'}, {'SHAPE': 'dddd'}
+        ],
+        'US_PUNCTUATED': [
+            {'ORTH': '('}, {'SHAPE': 'ddd'}, {'ORTH': ')'}, {'ORTH': '-', 'OP': '?'},
+            {'SHAPE': 'ddd'}, {'ORTH': '-'}, {'SHAPE': 'dddd'}
+        ],
+    }
 }
 
 # peculiarly, spaCy doesn't know what to do with some pronouns. if other parts of speech have these awkward cases, they
@@ -75,11 +102,15 @@ class LanguageEvaluator:
     will not be considered "words", and will be parsed out of the token indexing process:
         * proper nouns
         * non-lemma forms
-        * contractions (will be expanded into their individial components)
+        * contractions (will be expanded out to their individial components)
 
     TODO: handle mispelled words
+    TODO: handle numbers/integers
     TODO: consider analyzing token frequency within a user's Journal
     TODO: consider part of speech (POS) tagging
+    TODO: test lemma overrides
+    TODO: parse English stop words (such as "a") correctly
+    TODO: phone numbers with this pattern won't be correctly parsed out: "(ddd)-".  maybe tokenizer-matcher clash
 
     reference: https://realpython.com/natural-language-processing-spacy-python
     """
@@ -99,11 +130,13 @@ class LanguageEvaluator:
             suffix_search=suffix_re.search,
             infix_finditer=infix_re.finditer,
         )
+        patterns = []
         _matcher = matcher.Matcher(_processor.vocab)
         rejection_configs = [config for config in REJECTION_PATTERN_CONFIGURATION.values()]
         for config in rejection_configs:
             for rejection_key, pattern in config.items():  # NOTE: iteration is funny, since each dict is only length 1
-                _matcher.add(rejection_key, [pattern])
+                patterns.append(pattern)
+        _matcher.add(rejection_key, patterns)
 
         self.matcher = _matcher
         self.NLP = _processor
@@ -111,7 +144,7 @@ class LanguageEvaluator:
     def __init__(self, language):
         self._configure_processor(language)
 
-    def tokenize_entry(self, entry):
+    def tokenize_entry(self, entry, matcher_exceptions=None):
         """
         when entries get tokenized, only each token's base form will be considered.
         for example, the tokenizer will parse out the tokens "do", "doing", "did", and "does" from an expression
@@ -120,38 +153,30 @@ class LanguageEvaluator:
         any matches on the regular expressions and rules configured in the REJECTION_PATTERN_CONFIGURATION will
         also be parsed out.
         """
-        def parse_regex_matches(matches):
-            for _, start, end in matches:
-                span = doc[start:end]
-                yield span.text
-
-        def handle_lemma_override(token, pos):
-            if token.text in LEMMA_OVERRIDE_CONFIGURATION[pos]:
-                override = LEMMA_OVERRIDE_CONFIGURATION[pos][token.text]
-                return override
-
-        tokens = []  # ensure deterministic results for testing
+        tokens = []  # ensures deterministic results for testing
         doc = self.NLP(entry)  # non-intuitive spaCy term
         rejection_regex_matches = [
-            token for match in parse_regex_matches(self.matcher(doc)) for token in match.split(' ')
+            token for match in get_matcher_matches(self.matcher(doc), doc) for token in match.split(' ')
         ]  # TODO: not safe to assume that ALL matches will be delimited by a space character
+        matcher_exceptions = matcher_exceptions or []
 
-        for token in doc:
-            should_reject = token.is_punct or \
-                token.lemma_ in tokens or token.text in tokens or \
-                token.lemma_ in rejection_regex_matches or token.text in rejection_regex_matches
-            if should_reject:
-                continue
+        for token in doc:  # run tokens through the matcher before anything else
+            if token.text not in matcher_exceptions and token.lemma_ not in matcher_exceptions:
+                should_reject = token.is_punct or \
+                    token.lemma_ in tokens or token.text in tokens or \
+                    any([token.lemma_ in m or token.text in m for m in rejection_regex_matches])
+                if should_reject:
+                    continue
 
             # this is very clunky but it handles incorrect spaCy token lemmas. this is only relevant to
             # pronouns so far, but let's wire this up for any future lemma overrides
             # TODO: explore potential override clashes between different POS's
             for pos in LEMMA_OVERRIDE_CONFIGURATION.keys():
-                override_or_none = handle_lemma_override(token, pos)
-                if override_or_none is None:
+                lemma_override_or_none = get_lemma_override(token, pos)
+                if lemma_override_or_none is None:
                     token = token.lemma_
                 else:
-                    token = override_or_none
+                    token = lemma_override_or_none
                 if token not in tokens:
                     tokens.append(token)
         return tokens
