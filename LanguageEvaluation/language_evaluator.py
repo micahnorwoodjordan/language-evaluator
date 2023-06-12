@@ -104,7 +104,10 @@ class LanguageEvaluator:
         * non-lemma forms
         * contractions (will be expanded out to their individial components)
 
-    TODO: consider tree and subtree navigation for more language analystics
+    TODO: consider methods for language analystics and summarizing:
+        * tree and subtree navigation (analyze relationships and how different words relate to each other)
+        * shallow parsing/chunking/phrase detection (rope adjacent tokens into phrases based off of part of speech)
+        * named entity recognition (categorize named entities, i.e. person names, businesses, locations into categories)
     TODO: handle mispelled words
     TODO: handle numbers/integers
     TODO: consider analyzing token frequency within a user's Journal
