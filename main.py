@@ -1,8 +1,8 @@
 import argparse
 
 from UserInteraction.user_interaction_utilities import get_language, get_entry, display_results
-from LanguageEvaluation.language_evaluator import LanguageEvaluator
-from TokenIndexing.token_indexing_utilities import index_tokens
+from LanguageEvaluation.evaluator import LanguageEvaluator
+from TokenIndexing.indexer import TokenIndexer
 
 if __name__ == '__main__':
     """
@@ -18,12 +18,14 @@ if __name__ == '__main__':
 
         entry = get_entry()
         evaluator = LanguageEvaluator(language)
+        indexer = TokenIndexer(language)
+
         tokens = evaluator.tokenize_entry(entry)
-        index_tokens(tokens, language.name)
+        indexer.index_tokens(tokens)
         display_results(tokens)
 
     def run_app():
-        print('running app')
+        print('running app')  # TODO: build GUI
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--app', action='store_true', help='whether or not to start the app, instead of cli program')
