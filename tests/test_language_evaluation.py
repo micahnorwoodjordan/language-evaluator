@@ -1,4 +1,4 @@
-from LanguageEvaluation.language_evaluator import LanguageEvaluator, SupportedLanguages
+from LanguageEvaluation.evaluator import LanguageEvaluator, SupportedLanguages
 
 
 class TestEnglishEvaluation:
